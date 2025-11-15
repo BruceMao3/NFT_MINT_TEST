@@ -1,6 +1,7 @@
 /**
  * Wallet Diagnostics Tool
  * Use this to debug wallet connection issues
+ * Includes EIP-6963 wallet discovery diagnostics
  */
 
 export function diagnoseWalletEnvironment() {
@@ -13,6 +14,38 @@ export function diagnoseWalletEnvironment() {
 
   console.log('✅ Browser environment detected');
   console.log('');
+
+  // Check EIP-6963 wallet discovery
+  console.log('📡 EIP-6963 Wallet Discovery:');
+  console.log('   Triggering wallet discovery...');
+  
+  const discoveredWallets: any[] = [];
+  const discoveryListener = (event: any) => {
+    discoveredWallets.push(event.detail);
+  };
+
+  window.addEventListener('eip6963:announceProvider', discoveryListener);
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+  // Give wallets a moment to respond
+  setTimeout(() => {
+    window.removeEventListener('eip6963:announceProvider', discoveryListener);
+    
+    if (discoveredWallets.length > 0) {
+      console.log(`   ✅ Found ${discoveredWallets.length} EIP-6963 compatible wallet(s):`);
+      discoveredWallets.forEach((wallet, i) => {
+        console.log(`   Wallet ${i + 1}:`, {
+          name: wallet.info.name,
+          rdns: wallet.info.rdns,
+          uuid: wallet.info.uuid,
+        });
+      });
+    } else {
+      console.log('   ⚠️ No EIP-6963 compatible wallets found');
+      console.log('   → Wallets may be using legacy injection method');
+    }
+    console.log('');
+  }, 100);
 
   // Check window.ethereum
   console.log('📦 window.ethereum:');

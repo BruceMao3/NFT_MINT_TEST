@@ -8,23 +8,41 @@ Despite implementing a custom wallet selector, Trust Wallet is still popping up.
 
 ## 📦 本次更新内容 What's Included
 
-### 1. 详细的钱包诊断 Detailed Wallet Diagnostics
+### 1. ✨ **EIP-6963 钱包发现标准** ✨ (NEW!)
+
+**更新文件: `src/utils/walletConnection.ts`**
+- 实现 EIP-6963 标准钱包发现机制
+- 监听 `eip6963:announceProvider` 事件
+- 精确识别每个钱包（通过 RDNS 标识符）
+- 优先使用 EIP-6963 发现的 MetaMask (`io.metamask`)
+- 避免钱包之间的冲突和相互干扰
+
+**为什么这很重要：**
+- EIP-6963 是现代浏览器钱包的推荐标准
+- 可以在多钱包环境中准确识别和连接特定钱包
+- 不受钱包注入顺序影响
+- Trust Wallet 无法拦截 EIP-6963 发现的 provider
+
+### 2. 详细的钱包诊断 Detailed Wallet Diagnostics
 
 **新文件: `src/utils/walletDiagnostics.ts`**
 - 在应用加载时自动运行诊断
+- **新增：EIP-6963 钱包发现测试**
 - 检测所有安装的钱包扩展
 - 分析 `window.ethereum` 的状态
-- 提供详细的环境信息
+- 提供详细的环境信息和 RDNS 标识符
 
-### 2. 增强的连接日志 Enhanced Connection Logging
+### 3. 增强的连接日志 Enhanced Connection Logging
 
 **更新文件: `src/utils/walletConnection.ts`**
 - 每一步都有详细的 console.log
-- 显示找到的所有 provider
-- 标记 MetaMask 检测过程
+- **新增：显示 EIP-6963 发现的钱包**
+- 显示找到的所有 provider 和它们的 RDNS
+- 4 层级 MetaMask 检测机制
 - 记录连接请求的详细信息
+- Trust Wallet 过滤逻辑
 
-### 3. WalletConnect 反馈修复 WalletConnect Feedback Fix
+### 4. WalletConnect 反馈修复 WalletConnect Feedback Fix
 
 **更新文件: `src/App.tsx`**
 - WalletConnect 现在显示友好提示而不是静默失败
@@ -43,17 +61,21 @@ git status
 git add .
 
 # 提交
-git commit -m "debug: add extensive wallet diagnostics and logging
+git commit -m "feat: implement EIP-6963 wallet discovery to fix Trust Wallet conflict
 
 Changes:
-- Add walletDiagnostics.ts for environment analysis
-- Add detailed logging to walletConnection.ts
-- Log all providers and their properties
-- Run diagnostics on app load
-- Fix WalletConnect silent failure
-- Add step-by-step connection logging
+- ✨ Implement EIP-6963 wallet discovery standard
+- Listen for eip6963:announceProvider events
+- Prioritize EIP-6963 discovered MetaMask (io.metamask)
+- Add 4-tier MetaMask provider detection fallback
+- Filter out Trust Wallet in providers array
+- Enhance walletDiagnostics with EIP-6963 support
+- Add detailed logging for each discovery method
+- Add TRUST_WALLET_ISSUE_SOLUTION.md documentation
 
-Purpose: Debug why Trust Wallet still appears despite custom selector"
+Purpose: Use modern EIP-6963 standard to avoid wallet conflicts
+Why: EIP-6963 allows precise wallet identification via RDNS, preventing
+Trust Wallet from intercepting MetaMask connection requests"
 
 # 推送到 develop
 git push origin develop
@@ -85,9 +107,31 @@ Visit your Vercel dashboard to check deployment status.
 你应该会立即看到这些日志：
 
 ```javascript
+// EIP-6963 初始化 (NEW!)
+🔍 [EIP-6963] Starting wallet discovery...
+📢 [EIP-6963] Wallet announced: MetaMask io.metamask
+📢 [EIP-6963] Wallet announced: Trust Wallet com.trustwallet.app
+✅ [EIP-6963] Discovery initialized
+
+// 应用诊断
 🚀 App loaded - Running wallet diagnostics...
 🔬 ===== WALLET ENVIRONMENT DIAGNOSTICS =====
 ✅ Browser environment detected
+
+// EIP-6963 发现结果 (NEW!)
+📡 EIP-6963 Wallet Discovery:
+   Triggering wallet discovery...
+   ✅ Found 2 EIP-6963 compatible wallet(s):
+   Wallet 1: {
+     name: "MetaMask",
+     rdns: "io.metamask",
+     uuid: "..."
+   }
+   Wallet 2: {
+     name: "Trust Wallet",
+     rdns: "com.trustwallet.app",
+     uuid: "..."
+   }
 
 📦 window.ethereum:
   ✅ window.ethereum exists
@@ -114,7 +158,7 @@ Visit your Vercel dashboard to check deployment status.
 💡 Run "diagnoseWallets()" in console for wallet diagnostics
 ```
 
-**请复制这整个部分！**
+**请复制这整个部分！特别注意 EIP-6963 部分！**
 
 ### 第二部分：点击 "Connect Wallet" On Click Connect
 
@@ -136,16 +180,27 @@ Visit your Vercel dashboard to check deployment status.
 🎯 [handleWalletSelect] Selected wallet type: metamask
 ➡️ Connecting to MetaMask...
 🦊 [connectMetaMask] Starting MetaMask connection...
-🔍 Checking for MetaMask...
-window.ethereum.isMetaMask: true/false
-window.ethereum.isTrust: true/false
-window.ethereum.providers: Array(X) or undefined
+
+// NEW! EIP-6963 查找 (最优先)
+🔍 [getMetaMaskProvider] Searching for MetaMask...
+✅ [EIP-6963] Found MetaMask: MetaMask
+   RDNS: io.metamask
+
+// 如果 EIP-6963 失败，会使用传统方法
+⚠️ [EIP-6963] MetaMask not found via EIP-6963
+   Discovered wallets: ['com.trustwallet.app', ...]
+🔍 Checking window.ethereum properties...
+   window.ethereum.isMetaMask: true/false
+   window.ethereum.isTrust: true/false
+   window.ethereum.providers: Array(X) or undefined
 
 // 如果有多个 provider
 📦 Found multiple providers: 2
   Provider 0: { isMetaMask: true, isTrust: false, isPhantom: false }
   Provider 1: { isMetaMask: false, isTrust: true, isPhantom: false }
-✅ Found MetaMask in providers array (或其他消息)
+✅ Found MetaMask in providers array
+   isMetaMask: true
+   isTrust: false
 
 ✅ [connectMetaMask] MetaMask provider found
 Provider details: { isMetaMask: true, isTrust: false, ... }
@@ -154,7 +209,12 @@ Provider details: { isMetaMask: true, isTrust: false, ... }
 MetaMask connected: { address: "0x...", chainId: 11155420 }
 ```
 
-**请复制这整个部分！**
+**请复制这整个部分！特别注意是否使用了 EIP-6963 发现的 provider！**
+
+**关键诊断点：**
+- ✅ 是否看到 `✅ [EIP-6963] Found MetaMask`？
+- ✅ 如果没有，是否在传统方法中找到了 MetaMask？
+- ⚠️ 如果找到了，实际弹出的是哪个钱包？
 
 ### 第四部分：观察钱包弹窗 Observe Wallet Popups
 

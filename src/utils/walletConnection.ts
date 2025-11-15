@@ -1,6 +1,7 @@
 /**
  * Wallet Connection Utilities
  * Supports MetaMask and WalletConnect
+ * Uses EIP-6963 for better multi-wallet support
  */
 
 export type WalletType = 'metamask' | 'walletconnect';
@@ -12,12 +13,68 @@ export interface WalletConnectionResult {
   error?: string;
 }
 
+// EIP-6963 wallet provider interface
+interface EIP6963ProviderDetail {
+  info: {
+    uuid: string;
+    name: string;
+    icon: string;
+    rdns: string;
+  };
+  provider: any;
+}
+
+// Store discovered EIP-6963 providers
+const discoveredWallets = new Map<string, EIP6963ProviderDetail>();
+
+/**
+ * Listen for EIP-6963 wallet announcements
+ */
+function initEIP6963Discovery() {
+  if (typeof window === 'undefined') return;
+
+  console.log('🔍 [EIP-6963] Starting wallet discovery...');
+
+  // Listen for wallet announcements
+  window.addEventListener('eip6963:announceProvider', (event: any) => {
+    const detail = event.detail as EIP6963ProviderDetail;
+    console.log('📢 [EIP-6963] Wallet announced:', detail.info.name, detail.info.rdns);
+    discoveredWallets.set(detail.info.rdns, detail);
+  });
+
+  // Request wallet announcements
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+  console.log('✅ [EIP-6963] Discovery initialized');
+
+  // Give wallets time to respond (some wallets may respond asynchronously)
+  setTimeout(() => {
+    if (discoveredWallets.size > 0) {
+      console.log(`✅ [EIP-6963] Discovery complete: ${discoveredWallets.size} wallet(s) found`);
+      console.log('   Wallets:', Array.from(discoveredWallets.keys()));
+    } else {
+      console.log('⚠️ [EIP-6963] No wallets responded after 200ms');
+      console.log('   → Wallets may not support EIP-6963 or are slow to load');
+    }
+  }, 200);
+}
+
+// Initialize EIP-6963 discovery immediately
+if (typeof window !== 'undefined') {
+  initEIP6963Discovery();
+}
+
 /**
  * Check if MetaMask is installed
  */
 export function isMetaMaskInstalled(): boolean {
   if (typeof window === 'undefined' || !window.ethereum) {
     return false;
+  }
+
+  // Check EIP-6963 discovered wallets first
+  if (discoveredWallets.has('io.metamask')) {
+    return true;
   }
 
   // Check if MetaMask is available
@@ -35,19 +92,34 @@ export function isMetaMaskInstalled(): boolean {
 
 /**
  * Get MetaMask provider specifically
+ * Prioritizes EIP-6963 discovery for better multi-wallet support
  */
 export function getMetaMaskProvider() {
+  console.log('🔍 [getMetaMaskProvider] Searching for MetaMask...');
+
+  // Method 1: Try EIP-6963 discovered MetaMask (most reliable)
+  if (discoveredWallets.has('io.metamask')) {
+    const metamaskWallet = discoveredWallets.get('io.metamask')!;
+    console.log('✅ [EIP-6963] Found MetaMask:', metamaskWallet.info.name);
+    console.log('   RDNS:', metamaskWallet.info.rdns);
+    return metamaskWallet.provider;
+  }
+
+  console.log('⚠️ [EIP-6963] MetaMask not found via EIP-6963');
+  console.log('   Discovered wallets:', Array.from(discoveredWallets.keys()));
+
+  // Method 2: Check window.ethereum and providers array
   if (typeof window === 'undefined' || !window.ethereum) {
     console.error('❌ window.ethereum not found');
     return null;
   }
 
-  console.log('🔍 Checking for MetaMask...');
-  console.log('window.ethereum.isMetaMask:', window.ethereum.isMetaMask);
-  console.log('window.ethereum.isTrust:', (window.ethereum as any).isTrust);
-  console.log('window.ethereum.providers:', window.ethereum.providers);
+  console.log('🔍 Checking window.ethereum properties...');
+  console.log('   window.ethereum.isMetaMask:', window.ethereum.isMetaMask);
+  console.log('   window.ethereum.isTrust:', (window.ethereum as any).isTrust);
+  console.log('   window.ethereum.providers:', window.ethereum.providers);
 
-  // If there are multiple providers, find MetaMask
+  // Method 3: If there are multiple providers, find MetaMask
   if (window.ethereum.providers?.length) {
     console.log('📦 Found multiple providers:', window.ethereum.providers.length);
     window.ethereum.providers.forEach((p: any, i: number) => {
@@ -58,23 +130,36 @@ export function getMetaMaskProvider() {
       });
     });
 
-    const metamaskProvider = window.ethereum.providers.find((p: any) => p.isMetaMask);
+    // Filter out non-MetaMask providers explicitly
+    const metamaskProvider = window.ethereum.providers.find(
+      (p: any) => p.isMetaMask === true && !(p as any).isTrust
+    );
+
     if (metamaskProvider) {
       console.log('✅ Found MetaMask in providers array');
+      console.log('   isMetaMask:', metamaskProvider.isMetaMask);
+      console.log('   isTrust:', (metamaskProvider as any).isTrust);
       return metamaskProvider;
     } else {
       console.warn('⚠️ MetaMask not found in providers array');
+      // Try to find any provider with isMetaMask
+      const anyMetaMask = window.ethereum.providers.find((p: any) => p.isMetaMask);
+      if (anyMetaMask) {
+        console.log('⚠️ Found provider with isMetaMask flag (might not be pure MetaMask)');
+        return anyMetaMask;
+      }
       return null;
     }
   }
 
-  // If it's MetaMask, return it
-  if (window.ethereum.isMetaMask) {
-    console.log('✅ window.ethereum is MetaMask');
+  // Method 4: If it's MetaMask and not Trust, return it
+  if (window.ethereum.isMetaMask && !(window.ethereum as any).isTrust) {
+    console.log('✅ window.ethereum is MetaMask (and not Trust)');
     return window.ethereum;
   }
 
   console.error('❌ MetaMask not found');
+  console.error('   Consider using EIP-6963 compatible wallet or check extension installation');
   return null;
 }
 
@@ -215,7 +300,7 @@ export function getCurrentProvider() {
 /**
  * Switch to the correct network
  */
-export async function switchToNetwork(chainId: number, chainIdHex: string, networkConfig: any): Promise<boolean> {
+export async function switchToNetwork(_chainId: number, chainIdHex: string, networkConfig: any): Promise<boolean> {
   const provider = getCurrentProvider();
 
   if (!provider) {

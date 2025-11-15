@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getWalletState, type WalletState } from './sdk/wallet';
+import type { WalletState } from './sdk/types';
 import { buyToken, getTokenBalance, checkWhitelist, checkSaleActive } from './sdk/explorerContract';
 import { TOKEN_IDS, TOKEN_CONFIG, NETWORK_CONFIG, CONTRACT_ADDRESSES, getExplorerUrls, type TokenId } from './contracts/config';
 import {
   connectMetaMask,
-  connectWalletConnect,
   isMetaMaskInstalled,
   getCurrentProvider,
   switchToNetwork,
@@ -67,7 +66,7 @@ function App() {
     const handleAccountsChanged = (accounts: string[]) => {
       console.log('Accounts changed:', accounts);
       if (accounts.length > 0) {
-        setWalletState(prev => ({ ...prev, connected: true, address: accounts[0] }));
+        setWalletState((prev: WalletState) => ({ ...prev, connected: true, address: accounts[0] }));
         setTxStatus({ message: '', type: 'info' });
       } else {
         setWalletState({ connected: false });
