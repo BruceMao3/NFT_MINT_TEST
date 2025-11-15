@@ -172,6 +172,84 @@ body {
   color: #1e40af;
 }
 
+/* User NFTs Section */
+.user-nfts-section {
+  margin-top: 3rem;
+}
+
+.section-title {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.nft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.nft-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.nft-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.nft-image {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.nft-info {
+  padding: 1rem;
+}
+
+.nft-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.nft-token-id {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.nft-minted-at {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.75rem;
+}
+
+.nft-tx-link {
+  display: inline-block;
+  color: #4f46e5;
+  font-size: 0.875rem;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid #4f46e5;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.nft-tx-link:hover {
+  background: #4f46e5;
+  color: white;
+}
+
 /* Footer */
 .footer {
   background: rgba(255, 255, 255, 0.1);
@@ -180,6 +258,175 @@ body {
   text-align: center;
   color: white;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Token Selection */
+.token-selection {
+  margin: 2rem 0;
+}
+
+.token-selection h2 {
+  color: white;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.token-card {
+  padding: 1.5rem;
+  background: white;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.token-card:hover {
+  border-color: #4f46e5;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.token-card.selected {
+  border-color: #4f46e5;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.token-card h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.token-price {
+  font-size: 1.2rem;
+  color: #4f46e5;
+  font-weight: bold;
+  margin: 0.5rem 0;
+}
+
+.token-description {
+  color: #666;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.whitelist-required {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-weight: 500;
+}
+
+.token-balance {
+  color: #10b981;
+  font-weight: bold;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Amount Section */
+.amount-section {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.amount-section h2 {
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.amount-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 0.8rem;
+  font-size: 1.2rem;
+  text-align: center;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  color: #333;
+}
+
+.amount-input:focus {
+  outline: none;
+  border-color: #4f46e5;
+}
+
+.total-cost {
+  margin-top: 1rem;
+  font-size: 1.3rem;
+  color: white;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* Sale Status */
+.sale-status {
+  text-align: center;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.status-active {
+  color: #10b981;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.status-inactive {
+  color: #ef4444;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* Whitelist Badge */
+.whitelist-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #10b981;
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* Explorer Links */
+.explorer-links {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.explorer-links a {
+  color: white;
+  text-decoration: none;
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.explorer-links a:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
 }
 
 /* Responsive */
@@ -204,5 +451,13 @@ body {
   .btn-mint {
     padding: 0.875rem 2rem;
     font-size: 1rem;
+  }
+
+  .nft-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
   }
 }

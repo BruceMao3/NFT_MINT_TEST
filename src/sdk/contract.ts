@@ -31,7 +31,10 @@ export async function mint(mintPrice: string): Promise<SdkResult<TxResult>> {
 
   // Test mode: mock mint transaction
   if (config.testMode) {
-    const mockTxHash = `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
+    // Generate a proper 64-character hex string (32 bytes)
+    const mockTxHash = `0x${Array.from({ length: 64 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join('')}`;
 
     // Simulate transaction delay
     await new Promise(resolve => setTimeout(resolve, 2000));

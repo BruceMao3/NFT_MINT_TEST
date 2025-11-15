@@ -65,6 +65,15 @@ export interface MintRecordRequest {
   timestamp: string;
 }
 
+// User NFT
+export interface UserNft {
+  tokenId: string;
+  name: string;
+  image?: string;
+  mintedAt: string;
+  txHash: string;
+}
+
 // Error Codes
 export const ERROR_CODES = {
   WALLET_NOT_CONNECTED: 'WALLET_NOT_CONNECTED',

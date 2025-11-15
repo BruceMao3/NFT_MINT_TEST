@@ -2,6 +2,25 @@
 
 A comprehensive test project for NFT minting functionality with automated testing support.
 
+## ✨ 最新更新 (2025-11-08)
+
+### 🎉 新增功能
+- ✅ **用户 NFT 展示**: 前端新增"My NFTs"部分,显示用户已 Mint 的 NFT
+- ✅ **智能合约**: 完整的 ERC721 NFT 合约,可部署到 Sepolia 测试网
+- ✅ **后端 API**: 功能完整的 Express 后端服务,支持链上数据读取
+- ✅ **部署文档**: 详细的部署指南,包括合约、后端和前端
+
+### 📚 新增文档
+- `QUICK_START.md` - 快速启动指南
+- `DEPLOYMENT_GUIDE.md` - 完整部署文档
+- `UPDATES.md` - 详细更新日志
+
+### 🧪 测试状态
+- ✅ 所有 15 个 Playwright 测试通过
+- ✅ 前端功能完整可用
+- ✅ 后端 API 测试通过
+- ✅ 智能合约编译成功
+
 ## Overview
 
 This project demonstrates a production-ready NFT minting interface with:
@@ -11,6 +30,9 @@ This project demonstrates a production-ready NFT minting interface with:
 - **Automated testing** with Playwright
 - **Mock mode** for development and testing without real blockchain
 - **Testnet/Mainnet support** for production deployment
+- **User NFT Display** - View minted NFTs with metadata
+- **Complete Backend API** - Express server with blockchain integration
+- **Production-Ready Contract** - ERC721 NFT smart contract
 
 ## Architecture
 

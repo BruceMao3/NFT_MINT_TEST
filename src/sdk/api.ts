@@ -1,4 +1,4 @@
-import type { NftContractInfo, NftStats, MintRecordRequest, SdkResult } from './types';
+import type { NftContractInfo, NftStats, MintRecordRequest, UserNft, SdkResult } from './types';
 
 let apiBaseUrl = '';
 
@@ -77,6 +77,31 @@ export async function recordMintTransaction(
         ok: false,
         code: 'API_ERROR',
         message: result.message || 'Failed to record mint transaction',
+      };
+    }
+  } catch (error: any) {
+    return {
+      ok: false,
+      code: 'API_ERROR',
+      message: error.message || 'Network error',
+      detail: error,
+    };
+  }
+}
+
+// Get User NFTs
+export async function getUserNfts(walletAddress: string): Promise<SdkResult<UserNft[]>> {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/nft/user/${walletAddress}`);
+    const result = await response.json();
+
+    if (result.code === 200) {
+      return { ok: true, data: result.data };
+    } else {
+      return {
+        ok: false,
+        code: 'API_ERROR',
+        message: result.message || 'Failed to fetch user NFTs',
       };
     }
   } catch (error: any) {

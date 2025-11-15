@@ -1,5 +1,5 @@
-import type { SdkConfig, SdkResult, WalletState, NftContractInfo, NftStats, TxResult } from './types';
-import { initApi, getNftInfo as apiGetNftInfo, getNftStats as apiGetNftStats } from './api';
+import type { SdkConfig, SdkResult, WalletState, NftContractInfo, NftStats, TxResult, UserNft } from './types';
+import { initApi, getNftInfo as apiGetNftInfo, getNftStats as apiGetNftStats, getUserNfts as apiGetUserNfts } from './api';
 import {
   initWallet,
   connectWallet as walletConnect,
@@ -111,6 +111,17 @@ class NftMintSDK {
       };
     }
     return apiGetNftStats();
+  }
+
+  async getUserNfts(walletAddress: string): Promise<SdkResult<UserNft[]>> {
+    if (!this.ensureInitialized()) {
+      return {
+        ok: false,
+        code: 'SDK_NOT_INITIALIZED',
+        message: 'SDK not initialized',
+      };
+    }
+    return apiGetUserNfts(walletAddress);
   }
 
   // Mint Methods

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorer Protocol - 测试页面</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .token-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #388e3c;
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .balance {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Explorer Protocol 测试页面</h1>
+
+        <div class="info">
+            <strong>网络：</strong> OP Sepolia Testnet<br>
+            <strong>Chain ID：</strong> 11155420
+        </div>
+
+        <div id="wallet-section">
+            <h2>钱包连接</h2>
+            <button onclick="connectWallet()" id="connect-btn">连接 MetaMask</button>
+            <div id="wallet-info" style="display:none;">
+                <p><strong>已连接地址：</strong> <span id="address"></span></p>
+                <p><strong>ETH 余额：</strong> <span id="eth-balance"></span> ETH</p>
+            </div>
+        </div>
+
+        <div id="token-section" style="display:none;">
+            <h2>代币余额</h2>
+            <div class="token-card">
+                <h3>POWER Token</h3>
+                <p class="balance">余额: <span id="power-balance">0</span></p>
+                <input type="number" id="power-amount" value="1" min="1" max="1000">
+                <button onclick="buyToken(1)">购买 POWER (0.0000001 ETH/个)</button>
+            </div>
+
+            <div class="token-card">
+                <h3>OIL Token</h3>
+                <p class="balance">余额: <span id="oil-balance">0</span></p>
+                <input type="number" id="oil-amount" value="1" min="1" max="1000">
+                <button onclick="buyToken(2)">购买 OIL (0.0000001 ETH/个)</button>
+            </div>
+
+            <div class="token-card">
+                <h3>EXPLORER Token (需要白名单)</h3>
+                <p class="balance">余额: <span id="explorer-balance">0</span></p>
+                <p id="whitelist-status"></p>
+                <input type="number" id="explorer-amount" value="1" min="1" max="1000">
+                <button onclick="buyToken(3)" id="explorer-buy-btn">购买 EXPLORER (0.0000001 ETH/个)</button>
+            </div>
+
+            <button onclick="refreshBalances()">🔄 刷新余额</button>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <script type="module">
+        // 合约配置
+        const CONFIG = {
+            chainId: 11155420,
+            chainIdHex: '0xaa37dc',
+            contracts: {
+                ExplorerToken: '0x7528A496E0C212fcA3263D272a04309a2330FfC6',
+                Minter: '0x26F87856E62f2F72feD55938972684c2C1eFDcC9'
+            },
+            tokenIds: {
+                POWER: 1,
+                OIL: 2,
+                EXPLORER: 3
+            },
+            priceWei: '100000000000' // 0.0000001 ETH
+        };
+
+        // ABIs (简化版，只包含需要的函数)
+        const MINTER_ABI = [
+            "function buy(uint256 id, uint256 amount, address to) payable",
+            "function priceWei(uint256 id) view returns (uint256)",
+            "function whitelist(address user) view returns (bool)"
+        ];
+
+        const TOKEN_ABI = [
+            "function balanceOf(address account, uint256 id) view returns (uint256)",
+            "function balanceOfBatch(address[] accounts, uint256[] ids) view returns (uint256[])"
+        ];
+
+        let provider, signer, userAddress;
+        let minterContract, tokenContract;
+
+        // 连接钱包
+        window.connectWallet = async function() {
+            try {
+                if (!window.ethereum) {
+                    showMessage('请安装 MetaMask!', 'error');
+                    return;
+                }
+
+                // 请求账户访问
+                provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+
+                // 检查网络
+                const network = await provider.getNetwork();
+                if (Number(network.chainId) !== CONFIG.chainId) {
+                    await switchNetwork();
+                }
+
+                // 初始化合约
+                minterContract = new ethers.Contract(CONFIG.contracts.Minter, MINTER_ABI, signer);
+                tokenContract = new ethers.Contract(CONFIG.contracts.ExplorerToken, TOKEN_ABI, signer);
+
+                // 获取 ETH 余额
+                const balance = await provider.getBalance(userAddress);
+                const ethBalance = ethers.formatEther(balance);
+
+                // 更新 UI
+                document.getElementById('connect-btn').style.display = 'none';
+                document.getElementById('wallet-info').style.display = 'block';
+                document.getElementById('token-section').style.display = 'block';
+                document.getElementById('address').textContent = userAddress;
+                document.getElementById('eth-balance').textContent = parseFloat(ethBalance).toFixed(6);
+
+                showMessage('钱包连接成功!', 'success');
+
+                // 刷新余额
+                await refreshBalances();
+
+            } catch (error) {
+                console.error(error);
+                showMessage('连接失败: ' + error.message, 'error');
+            }
+        };
+
+        // 切换网络
+        async function switchNetwork() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: CONFIG.chainIdHex }],
+                });
+            } catch (error) {
+                // 如果网络不存在，添加网络
+                if (error.code === 4902) {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: CONFIG.chainIdHex,
+                            chainName: 'OP Sepolia',
+                            nativeCurrency: {
+                                name: 'Ethereum',
+                                symbol: 'ETH',
+                                decimals: 18
+                            },
+                            rpcUrls: ['https://sepolia.optimism.io'],
+                            blockExplorerUrls: ['https://sepolia-optimism.etherscan.io']
+                        }]
+                    });
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // 刷新余额
+        window.refreshBalances = async function() {
+            try {
+                const addresses = [userAddress, userAddress, userAddress];
+                const ids = [CONFIG.tokenIds.POWER, CONFIG.tokenIds.OIL, CONFIG.tokenIds.EXPLORER];
+
+                const balances = await tokenContract.balanceOfBatch(addresses, ids);
+
+                document.getElementById('power-balance').textContent = balances[0].toString();
+                document.getElementById('oil-balance').textContent = balances[1].toString();
+                document.getElementById('explorer-balance').textContent = balances[2].toString();
+
+                // 检查白名单状态
+                const isWhitelisted = await minterContract.whitelist(userAddress);
+                const whitelistEl = document.getElementById('whitelist-status');
+                const explorerBtn = document.getElementById('explorer-buy-btn');
+
+                if (isWhitelisted) {
+                    whitelistEl.innerHTML = '✅ <span style="color: green;">您在白名单中</span>';
+                    explorerBtn.disabled = false;
+                } else {
+                    whitelistEl.innerHTML = '❌ <span style="color: red;">您不在白名单中</span>';
+                    explorerBtn.disabled = true;
+                }
+
+                showMessage('余额已刷新', 'success');
+            } catch (error) {
+                console.error(error);
+                showMessage('刷新余额失败: ' + error.message, 'error');
+            }
+        };
+
+        // 购买代币
+        window.buyToken = async function(tokenId) {
+            try {
+                let amount, tokenName;
+
+                if (tokenId === 1) {
+                    amount = document.getElementById('power-amount').value;
+                    tokenName = 'POWER';
+                } else if (tokenId === 2) {
+                    amount = document.getElementById('oil-amount').value;
+                    tokenName = 'OIL';
+                } else {
+                    amount = document.getElementById('explorer-amount').value;
+                    tokenName = 'EXPLORER';
+                }
+
+                if (!amount || amount < 1) {
+                    showMessage('请输入有效数量', 'error');
+                    return;
+                }
+
+                showMessage(`正在购买 ${amount} 个 ${tokenName}...`, 'info');
+
+                // 计算总价
+                const priceWei = BigInt(CONFIG.priceWei);
+                const totalCost = priceWei * BigInt(amount);
+
+                // 发送交易
+                const tx = await minterContract.buy(
+                    tokenId,
+                    amount,
+                    userAddress,
+                    { value: totalCost }
+                );
+
+                showMessage(`交易已发送，等待确认... (TX: ${tx.hash.substring(0, 10)}...)`, 'info');
+
+                // 等待确认
+                const receipt = await tx.wait();
+
+                showMessage(`✅ 购买成功! 已购买 ${amount} 个 ${tokenName}`, 'success');
+
+                // 刷新余额
+                await refreshBalances();
+
+            } catch (error) {
+                console.error(error);
+                let errorMsg = '购买失败: ';
+
+                if (error.message.includes('WalletCapExceeded')) {
+                    errorMsg += '超出钱包持有上限 (每种代币最多 1000 个)';
+                } else if (error.message.includes('NotWhitelisted')) {
+                    errorMsg += '您不在白名单中，无法购买 EXPLORER';
+                } else if (error.message.includes('insufficient funds')) {
+                    errorMsg += 'ETH 余额不足';
+                } else if (error.message.includes('user rejected')) {
+                    errorMsg += '您取消了交易';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                showMessage(errorMsg, 'error');
+            }
+        };
+
+        // 显示消息
+        function showMessage(msg, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = msg;
+            messageDiv.style.display = 'block';
+
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

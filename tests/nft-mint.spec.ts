@@ -54,6 +54,33 @@ test.describe('NFT Mint Page', () => {
       });
     });
 
+    await context.route('**/api/nft/user/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          message: 'success',
+          data: [
+            {
+              tokenId: '1',
+              name: 'Test NFT #1',
+              image: 'https://via.placeholder.com/250',
+              mintedAt: new Date().toISOString(),
+              txHash: '0x1234567890123456789012345678901234567890123456789012345678901234',
+            },
+            {
+              tokenId: '2',
+              name: 'Test NFT #2',
+              image: 'https://via.placeholder.com/250',
+              mintedAt: new Date().toISOString(),
+              txHash: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+            },
+          ],
+        }),
+      });
+    });
+
     await page.goto('/');
   });
 
@@ -235,19 +262,86 @@ test.describe('NFT Mint Page', () => {
     await expect(page.getByTestId('stats-section')).toBeVisible();
     await expect(page.getByTestId('mint-btn')).toBeVisible();
   });
+
+  test('should display user NFTs when wallet is connected', async ({ page }) => {
+    await page.waitForTimeout(1000);
+
+    // Should show user NFTs section
+    const nftsSection = page.getByTestId('user-nfts-section');
+    await expect(nftsSection).toBeVisible();
+
+    // Should show NFT count in title
+    const sectionTitle = nftsSection.locator('.section-title');
+    await expect(sectionTitle).toContainText('My NFTs (2)');
+
+    // Should display NFT cards
+    const nftCards = page.getByTestId('nft-card');
+    await expect(nftCards).toHaveCount(2);
+  });
 });
 
 test.describe('Wallet Connection', () => {
   test('should disconnect wallet successfully', async ({ page, context }) => {
-    // Setup mocks
-    await context.route('**/api/nft/**', async (route) => {
+    // Setup mocks for NFT info
+    await context.route('**/api/nft/info', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           code: 200,
           message: 'success',
-          data: {},
+          data: {
+            contractAddress: '0x1234567890123456789012345678901234567890',
+            totalSupply: 10000,
+            mintPrice: '0.0001',
+            maxSupply: 10000,
+            name: 'Test NFT Collection',
+            symbol: 'TNFT',
+          },
+        }),
+      });
+    });
+
+    await context.route('**/api/nft/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          message: 'success',
+          data: {
+            totalMinted: 1766,
+            remainingSupply: 8234,
+            totalFundsRaised: '0.1766',
+            remainingFunds: '0.8234',
+            lastMintTime: new Date().toISOString(),
+          },
+        }),
+      });
+    });
+
+    await context.route('**/api/nft/mint-record', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          message: 'Record saved successfully',
+          data: {
+            recordId: `rec_${Date.now()}`,
+          },
+        }),
+      });
+    });
+
+    await context.route('**/api/nft/user/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          message: 'success',
+          data: [],
         }),
       });
     });

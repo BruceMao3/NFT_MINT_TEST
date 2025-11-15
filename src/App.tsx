@@ -1,81 +1,254 @@
 import { useEffect, useState } from 'react';
-import sdk, { type NftContractInfo, type NftStats, type WalletState, TxStatus } from './sdk';
+import { getWalletState, type WalletState } from './sdk/wallet';
+import { buyToken, getTokenBalance, checkWhitelist, checkSaleActive } from './sdk/explorerContract';
+import { TOKEN_IDS, TOKEN_CONFIG, NETWORK_CONFIG, CONTRACT_ADDRESSES, getExplorerUrls, type TokenId } from './contracts/config';
 import './App.css';
+
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
+// Helper function to get the preferred Ethereum provider
+function getEthereumProvider() {
+  if (typeof window.ethereum === 'undefined') {
+    return null;
+  }
+
+  // If window.ethereum.providers exists, find MetaMask
+  if (window.ethereum.providers?.length) {
+    const metamask = window.ethereum.providers.find((p: any) => p.isMetaMask);
+    return metamask || window.ethereum.providers[0];
+  }
+
+  // Otherwise use window.ethereum directly
+  return window.ethereum;
+}
 
 function App() {
   const [walletState, setWalletState] = useState<WalletState>({ connected: false });
-  const [nftInfo, setNftInfo] = useState<NftContractInfo | null>(null);
-  const [nftStats, setNftStats] = useState<NftStats | null>(null);
+  const [selectedToken, setSelectedToken] = useState<TokenId>(TOKEN_IDS.POWER);
+  const [amount, setAmount] = useState<number>(1);
   const [loading, setLoading] = useState(false);
+  const [saleActive, setSaleActive] = useState(false);
+  const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [balances, setBalances] = useState<Record<TokenId, number>>({
+    [TOKEN_IDS.POWER]: 0,
+    [TOKEN_IDS.OIL]: 0,
+    [TOKEN_IDS.EXPLORER]: 0,
+  });
   const [txStatus, setTxStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' }>({
     message: '',
     type: 'info',
   });
 
-  // Initialize SDK
+  // Check wallet state
   useEffect(() => {
-    sdk.init({
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
-      chainId: parseInt(import.meta.env.VITE_CHAIN_ID),
-      contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-      rpcUrl: import.meta.env.VITE_RPC_URL,
-      walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-      testMode: import.meta.env.VITE_TEST_MODE === 'true',
-      mockWalletAddress: import.meta.env.VITE_MOCK_WALLET_ADDRESS,
-    });
+    const checkWallet = async () => {
+      const provider = getEthereumProvider();
+      if (provider) {
+        try {
+          const accounts = await provider.request({ method: 'eth_accounts' });
+          if (accounts.length > 0) {
+            const chainId = await provider.request({ method: 'eth_chainId' });
+            setWalletState({
+              connected: true,
+              address: accounts[0],
+              chainId: parseInt(chainId, 16),
+            });
+          }
+        } catch (error) {
+          console.error('Error checking wallet:', error);
+        }
+      }
+    };
+    checkWallet();
 
-    // Subscribe to wallet state changes
-    const unsubscribe = sdk.onWalletStateChange((state) => {
-      setWalletState(state);
-    });
+    // Event handlers
+    const handleAccountsChanged = (accounts: string[]) => {
+      console.log('Accounts changed:', accounts);
+      if (accounts.length > 0) {
+        setWalletState(prev => ({ ...prev, connected: true, address: accounts[0] }));
+        // Clear any error messages
+        setTxStatus({ message: '', type: 'info' });
+      } else {
+        setWalletState({ connected: false });
+        setTxStatus({ message: 'Wallet disconnected', type: 'info' });
+      }
+    };
 
-    // Initial wallet state
-    setWalletState(sdk.getWalletState());
+    const handleChainChanged = (chainId: string) => {
+      console.log('Chain changed to:', chainId);
+      window.location.reload();
+    };
 
-    // Fetch initial data
-    fetchNftData();
+    // Listen for account and chain changes
+    const provider = getEthereumProvider();
+    if (provider) {
+      provider.on('accountsChanged', handleAccountsChanged);
+      provider.on('chainChanged', handleChainChanged);
+    }
 
+    // Cleanup event listeners
     return () => {
-      unsubscribe();
+      const provider = getEthereumProvider();
+      if (provider && provider.removeListener) {
+        provider.removeListener('accountsChanged', handleAccountsChanged);
+        provider.removeListener('chainChanged', handleChainChanged);
+      }
     };
   }, []);
 
-  const fetchNftData = async () => {
-    const infoResult = await sdk.getNftInfo();
-    if (infoResult.ok) {
-      setNftInfo(infoResult.data);
-    }
+  // Load balances and whitelist status when wallet connects
+  useEffect(() => {
+    const loadData = async () => {
+      if (walletState.connected && walletState.address) {
+        // Check whitelist
+        const whitelistResult = await checkWhitelist(walletState.address);
+        if (whitelistResult.ok) {
+          setIsWhitelisted(whitelistResult.data);
+        }
 
-    const statsResult = await sdk.getNftStats();
-    if (statsResult.ok) {
-      setNftStats(statsResult.data);
-    }
-  };
+        // Load balances for all tokens
+        for (const tokenId of [TOKEN_IDS.POWER, TOKEN_IDS.OIL, TOKEN_IDS.EXPLORER]) {
+          const balanceResult = await getTokenBalance(walletState.address, tokenId);
+          if (balanceResult.ok) {
+            setBalances(prev => ({ ...prev, [tokenId]: balanceResult.data }));
+          }
+        }
+      }
+    };
+
+    loadData();
+  }, [walletState.connected, walletState.address]);
+
+  // Check sale status
+  useEffect(() => {
+    const checkSale = async () => {
+      const saleResult = await checkSaleActive();
+      if (saleResult.ok) {
+        setSaleActive(saleResult.data);
+      }
+    };
+    checkSale();
+  }, []);
 
   const handleConnectWallet = async () => {
-    setLoading(true);
-    const result = await sdk.connectWallet();
-    setLoading(false);
+    const provider = getEthereumProvider();
 
-    if (!result.ok) {
+    if (!provider) {
       setTxStatus({
-        message: result.message,
+        message: 'Please install MetaMask or another Web3 wallet',
         type: 'error',
       });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setTxStatus({ message: '', type: 'info' }); // Clear previous errors
+
+      console.log('Requesting accounts from provider...');
+
+      // Request accounts - this will show the wallet selector
+      const accounts = await provider.request({
+        method: 'eth_requestAccounts',
+      });
+
+      console.log('Accounts received:', accounts);
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts returned');
+      }
+
+      // Check if on correct network
+      const chainId = await provider.request({ method: 'eth_chainId' });
+      const currentChainId = parseInt(chainId, 16);
+
+      console.log('Current chain ID:', currentChainId, 'Expected:', NETWORK_CONFIG.chainId);
+
+      if (currentChainId !== NETWORK_CONFIG.chainId) {
+        // Try to switch network
+        try {
+          await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: NETWORK_CONFIG.chainIdHex }],
+          });
+        } catch (switchError: any) {
+          // This error code indicates that the chain has not been added to MetaMask
+          if (switchError.code === 4902) {
+            try {
+              await provider.request({
+                method: 'wallet_addEthereumChain',
+                params: [
+                  {
+                    chainId: NETWORK_CONFIG.chainIdHex,
+                    chainName: NETWORK_CONFIG.chainName,
+                    nativeCurrency: NETWORK_CONFIG.nativeCurrency,
+                    rpcUrls: [NETWORK_CONFIG.publicRpcUrl],
+                    blockExplorerUrls: [NETWORK_CONFIG.blockExplorer],
+                  },
+                ],
+              });
+            } catch (addError) {
+              throw new Error('Failed to add network');
+            }
+          } else {
+            throw switchError;
+          }
+        }
+      }
+
+      setWalletState({
+        connected: true,
+        address: accounts[0],
+        chainId: NETWORK_CONFIG.chainId,
+      });
+
+      setTxStatus({
+        message: 'Wallet connected successfully',
+        type: 'success',
+      });
+    } catch (error: any) {
+      console.error('Wallet connection error:', error);
+
+      // Handle user rejection
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        setTxStatus({
+          message: 'Connection cancelled',
+          type: 'info',
+        });
+      } else {
+        setTxStatus({
+          message: error.message || 'Failed to connect wallet',
+          type: 'error',
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDisconnectWallet = async () => {
-    await sdk.disconnectWallet();
-    setTxStatus({
-      message: '',
-      type: 'info',
-    });
+  const handleDisconnectWallet = () => {
+    setWalletState({ connected: false });
+    setTxStatus({ message: '', type: 'info' });
   };
 
-  const handleMint = async () => {
+  const handleBuy = async () => {
     if (!walletState.connected) {
       await handleConnectWallet();
+      return;
+    }
+
+    const tokenInfo = TOKEN_CONFIG[selectedToken];
+
+    // Check whitelist requirement
+    if (tokenInfo.whitelistRequired && !isWhitelisted) {
+      setTxStatus({
+        message: 'You are not whitelisted for this token',
+        type: 'error',
+      });
       return;
     }
 
@@ -85,8 +258,7 @@ function App() {
       type: 'info',
     });
 
-    const mintPrice = nftInfo?.mintPrice || '0.0001';
-    const result = await sdk.mint(mintPrice);
+    const result = await buyToken(selectedToken, amount);
 
     if (result.ok) {
       setTxStatus({
@@ -94,8 +266,13 @@ function App() {
         type: 'success',
       });
 
-      // Refresh stats after successful mint
-      await fetchNftData();
+      // Refresh balance
+      if (walletState.address) {
+        const balanceResult = await getTokenBalance(walletState.address, selectedToken);
+        if (balanceResult.ok) {
+          setBalances(prev => ({ ...prev, [selectedToken]: balanceResult.data }));
+        }
+      }
     } else {
       setTxStatus({
         message: `Transaction failed: ${result.message}`,
@@ -110,12 +287,14 @@ function App() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const isSoldOut = nftStats?.remainingSupply === 0;
+  const selectedTokenInfo = TOKEN_CONFIG[selectedToken];
+  const totalCost = parseFloat(selectedTokenInfo.priceETH) * amount;
 
   return (
     <div className="app">
       <header className="header">
-        <h1>NFT Mint Test</h1>
+        <h1>Explorer Protocol - Token Sale</h1>
+        <p>OP Sepolia Testnet</p>
       </header>
 
       <main className="main">
@@ -123,7 +302,10 @@ function App() {
         <div className="wallet-section" data-testid="wallet-section">
           {walletState.connected ? (
             <div className="wallet-connected">
-              <span data-testid="wallet-address">Connected: {formatAddress(walletState.address!)}</span>
+              <span data-testid="wallet-address">
+                Connected: {formatAddress(walletState.address!)}
+                {isWhitelisted && <span className="whitelist-badge">Whitelisted</span>}
+              </span>
               <button onClick={handleDisconnectWallet} className="btn btn-secondary">
                 Disconnect
               </button>
@@ -140,49 +322,69 @@ function App() {
           )}
         </div>
 
-        {/* NFT Stats */}
-        <div className="stats-section" data-testid="stats-section">
-          <div className="stat-card">
-            <div className="stat-label">NFT Total Supply</div>
-            <div className="stat-value" data-testid="total-supply">
-              {nftInfo?.totalSupply.toLocaleString() || '-'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Remaining Supply</div>
-            <div className="stat-value" data-testid="remaining-supply">
-              {nftStats?.remainingSupply.toLocaleString() || '-'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Total Minted</div>
-            <div className="stat-value" data-testid="total-minted">
-              {nftStats?.totalMinted.toLocaleString() || '-'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Total Funds Raised</div>
-            <div className="stat-value" data-testid="total-funds">
-              {nftStats?.totalFundsRaised || '-'} ETH
-            </div>
+        {/* Sale Status */}
+        <div className="sale-status">
+          <span className={saleActive ? 'status-active' : 'status-inactive'}>
+            Sale Status: {saleActive ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+
+        {/* Token Selection */}
+        <div className="token-selection">
+          <h2>Select Token</h2>
+          <div className="token-grid">
+            {([TOKEN_IDS.POWER, TOKEN_IDS.OIL, TOKEN_IDS.EXPLORER] as TokenId[]).map((tokenId) => {
+              const tokenInfo = TOKEN_CONFIG[tokenId];
+              return (
+                <div
+                  key={tokenId}
+                  className={`token-card ${selectedToken === tokenId ? 'selected' : ''}`}
+                  onClick={() => setSelectedToken(tokenId)}
+                >
+                  <h3>{tokenInfo.name}</h3>
+                  <p className="token-price">{tokenInfo.priceETH} ETH</p>
+                  <p className="token-description">{tokenInfo.description}</p>
+                  {tokenInfo.whitelistRequired && (
+                    <p className="whitelist-required">Whitelist Required</p>
+                  )}
+                  {walletState.connected && (
+                    <p className="token-balance">Balance: {balances[tokenId]}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Mint Button */}
+        {/* Amount Selection */}
+        <div className="amount-section">
+          <h2>Amount</h2>
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={amount}
+            onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 1))}
+            className="amount-input"
+          />
+          <p className="total-cost">Total Cost: {totalCost.toFixed(7)} ETH</p>
+        </div>
+
+        {/* Buy Button */}
         <div className="mint-section">
           <button
-            onClick={handleMint}
+            onClick={handleBuy}
             className="btn btn-mint"
-            disabled={loading || isSoldOut}
-            data-testid="mint-btn"
+            disabled={loading || !saleActive}
+            data-testid="buy-btn"
           >
             {loading
-              ? 'Minting...'
-              : isSoldOut
-              ? 'Sold Out'
+              ? 'Processing...'
+              : !saleActive
+              ? 'Sale Inactive'
               : walletState.connected
-              ? `Mint NFT (${nftInfo?.mintPrice || '0.0001'} ETH)`
-              : 'Connect Wallet to Mint'}
+              ? `Buy ${amount} ${selectedTokenInfo.name}`
+              : 'Connect Wallet to Buy'}
           </button>
         </div>
 
@@ -192,10 +394,30 @@ function App() {
             {txStatus.message}
           </div>
         )}
+
+        {/* View on Block Explorer */}
+        {walletState.connected && (
+          <div className="explorer-links">
+            <a
+              href={getExplorerUrls(CONTRACT_ADDRESSES.Minter, 'address')}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Minter Contract
+            </a>
+            <a
+              href={getExplorerUrls(CONTRACT_ADDRESSES.ExplorerToken, 'address')}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Token Contract
+            </a>
+          </div>
+        )}
       </main>
 
       <footer className="footer">
-        <p>NFT Mint Test Project - Powered by Ethereum</p>
+        <p>Explorer Protocol - Powered by OP Sepolia</p>
       </footer>
     </div>
   );
