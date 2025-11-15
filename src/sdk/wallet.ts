@@ -39,6 +39,15 @@ export function getWalletState(): WalletState {
   return { ...walletState };
 }
 
+/**
+ * Update wallet state (for external wallet connections)
+ * This allows App.tsx to update the SDK wallet state when using custom wallet connection
+ */
+export function updateWalletState(newState: WalletState): void {
+  walletState = { ...newState };
+  notifyListeners();
+}
+
 export async function connectWallet(): Promise<SdkResult<WalletState>> {
   if (!config) {
     return {

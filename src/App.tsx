@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WalletState } from './sdk/types';
 import { buyToken, getTokenBalance, checkWhitelist, checkSaleActive } from './sdk/explorerContract';
+import { updateWalletState } from './sdk/index';
 import { TOKEN_IDS, TOKEN_CONFIG, NETWORK_CONFIG, CONTRACT_ADDRESSES, getExplorerUrls, type TokenId } from './contracts/config';
 import {
   connectMetaMask,
@@ -49,11 +50,14 @@ function App() {
           const accounts = await provider.request({ method: 'eth_accounts' });
           if (accounts.length > 0) {
             const chainId = await provider.request({ method: 'eth_chainId' });
-            setWalletState({
+            const walletState: WalletState = {
               connected: true,
               address: accounts[0],
               chainId: parseInt(chainId, 16),
-            });
+            };
+            setWalletState(walletState);
+            // Sync with SDK state
+            updateWalletState(walletState);
           }
         } catch (error) {
           console.error('Error checking wallet:', error);
@@ -66,10 +70,14 @@ function App() {
     const handleAccountsChanged = (accounts: string[]) => {
       console.log('Accounts changed:', accounts);
       if (accounts.length > 0) {
-        setWalletState((prev: WalletState) => ({ ...prev, connected: true, address: accounts[0] }));
+        const newState: WalletState = { connected: true, address: accounts[0], chainId: walletState.chainId };
+        setWalletState(newState);
+        updateWalletState(newState);
         setTxStatus({ message: '', type: 'info' });
       } else {
-        setWalletState({ connected: false });
+        const disconnectedState: WalletState = { connected: false };
+        setWalletState(disconnectedState);
+        updateWalletState(disconnectedState);
         setTxStatus({ message: 'Wallet disconnected', type: 'info' });
       }
     };
@@ -196,11 +204,17 @@ function App() {
         }
       }
 
-      setWalletState({
+      const newWalletState: WalletState = {
         connected: true,
         address: result.address!,
         chainId: NETWORK_CONFIG.chainId,
-      });
+      };
+
+      // Update local state
+      setWalletState(newWalletState);
+
+      // Sync with SDK state for buyToken to work
+      updateWalletState(newWalletState);
 
       setTxStatus({
         message: 'Wallet connected successfully',
@@ -218,7 +232,10 @@ function App() {
   };
 
   const handleDisconnectWallet = () => {
-    setWalletState({ connected: false });
+    const disconnectedState: WalletState = { connected: false };
+    setWalletState(disconnectedState);
+    // Sync with SDK state
+    updateWalletState(disconnectedState);
     setTxStatus({ message: '', type: 'info' });
   };
 

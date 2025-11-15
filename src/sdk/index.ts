@@ -6,6 +6,7 @@ import {
   disconnectWallet as walletDisconnect,
   switchNetwork as walletSwitchNetwork,
   getWalletState,
+  updateWalletState,
   onWalletStateChange,
 } from './wallet';
 import { initContract, mint as contractMint, getTxStatus as contractGetTxStatus } from './contract';
@@ -86,6 +87,10 @@ class NftMintSDK {
     return getWalletState();
   }
 
+  updateWalletState(newState: WalletState): void {
+    updateWalletState(newState);
+  }
+
   onWalletStateChange(listener: (state: WalletState) => void): () => void {
     return onWalletStateChange(listener);
   }
@@ -150,6 +155,9 @@ class NftMintSDK {
 
 // Export singleton instance
 export const sdk = new NftMintSDK();
+
+// Export wallet state update function for direct use
+export { updateWalletState } from './wallet';
 
 // Default export
 export default sdk;

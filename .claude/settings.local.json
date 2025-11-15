@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git push:*)",
+      "Bash(npm test:*)",
+      "Bash(npm install:*)",
+      "Bash(npm init:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)",
+      "Bash(npm run build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
