@@ -2,28 +2,20 @@ import { useEffect, useState } from 'react';
 import { getWalletState, type WalletState } from './sdk/wallet';
 import { buyToken, getTokenBalance, checkWhitelist, checkSaleActive } from './sdk/explorerContract';
 import { TOKEN_IDS, TOKEN_CONFIG, NETWORK_CONFIG, CONTRACT_ADDRESSES, getExplorerUrls, type TokenId } from './contracts/config';
+import {
+  connectMetaMask,
+  connectWalletConnect,
+  isMetaMaskInstalled,
+  getCurrentProvider,
+  switchToNetwork,
+  type WalletType
+} from './utils/walletConnection';
 import './App.css';
 
 declare global {
   interface Window {
     ethereum?: any;
   }
-}
-
-// Helper function to get the preferred Ethereum provider
-function getEthereumProvider() {
-  if (typeof window.ethereum === 'undefined') {
-    return null;
-  }
-
-  // If window.ethereum.providers exists, find MetaMask
-  if (window.ethereum.providers?.length) {
-    const metamask = window.ethereum.providers.find((p: any) => p.isMetaMask);
-    return metamask || window.ethereum.providers[0];
-  }
-
-  // Otherwise use window.ethereum directly
-  return window.ethereum;
 }
 
 function App() {
@@ -33,6 +25,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [saleActive, setSaleActive] = useState(false);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [balances, setBalances] = useState<Record<TokenId, number>>({
     [TOKEN_IDS.POWER]: 0,
     [TOKEN_IDS.OIL]: 0,
@@ -46,7 +39,7 @@ function App() {
   // Check wallet state
   useEffect(() => {
     const checkWallet = async () => {
-      const provider = getEthereumProvider();
+      const provider = getCurrentProvider();
       if (provider) {
         try {
           const accounts = await provider.request({ method: 'eth_accounts' });
@@ -70,7 +63,6 @@ function App() {
       console.log('Accounts changed:', accounts);
       if (accounts.length > 0) {
         setWalletState(prev => ({ ...prev, connected: true, address: accounts[0] }));
-        // Clear any error messages
         setTxStatus({ message: '', type: 'info' });
       } else {
         setWalletState({ connected: false });
@@ -84,7 +76,7 @@ function App() {
     };
 
     // Listen for account and chain changes
-    const provider = getEthereumProvider();
+    const provider = getCurrentProvider();
     if (provider) {
       provider.on('accountsChanged', handleAccountsChanged);
       provider.on('chainChanged', handleChainChanged);
@@ -92,7 +84,7 @@ function App() {
 
     // Cleanup event listeners
     return () => {
-      const provider = getEthereumProvider();
+      const provider = getCurrentProvider();
       if (provider && provider.removeListener) {
         provider.removeListener('accountsChanged', handleAccountsChanged);
         provider.removeListener('chainChanged', handleChainChanged);
@@ -134,75 +126,62 @@ function App() {
     checkSale();
   }, []);
 
-  const handleConnectWallet = async () => {
-    const provider = getEthereumProvider();
+  // Show wallet selector modal
+  const handleConnectWallet = () => {
+    setShowWalletModal(true);
+  };
 
-    if (!provider) {
-      setTxStatus({
-        message: 'Please install MetaMask or another Web3 wallet',
-        type: 'error',
-      });
-      return;
-    }
+  // Connect with selected wallet type
+  const handleWalletSelect = async (walletType: WalletType) => {
+    setShowWalletModal(false);
+    setLoading(true);
+    setTxStatus({ message: '', type: 'info' });
 
     try {
-      setLoading(true);
-      setTxStatus({ message: '', type: 'info' }); // Clear previous errors
+      let result;
 
-      console.log('Requesting accounts from provider...');
-
-      // Request accounts - this will show the wallet selector
-      const accounts = await provider.request({
-        method: 'eth_requestAccounts',
-      });
-
-      console.log('Accounts received:', accounts);
-
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts returned');
+      if (walletType === 'metamask') {
+        result = await connectMetaMask();
+      } else if (walletType === 'walletconnect') {
+        result = await connectWalletConnect();
+      } else {
+        throw new Error('Unknown wallet type');
       }
 
-      // Check if on correct network
-      const chainId = await provider.request({ method: 'eth_chainId' });
-      const currentChainId = parseInt(chainId, 16);
+      if (!result.success) {
+        setTxStatus({
+          message: result.error || 'Failed to connect wallet',
+          type: 'error',
+        });
+        return;
+      }
 
-      console.log('Current chain ID:', currentChainId, 'Expected:', NETWORK_CONFIG.chainId);
-
-      if (currentChainId !== NETWORK_CONFIG.chainId) {
-        // Try to switch network
-        try {
-          await provider.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: NETWORK_CONFIG.chainIdHex }],
-          });
-        } catch (switchError: any) {
-          // This error code indicates that the chain has not been added to MetaMask
-          if (switchError.code === 4902) {
-            try {
-              await provider.request({
-                method: 'wallet_addEthereumChain',
-                params: [
-                  {
-                    chainId: NETWORK_CONFIG.chainIdHex,
-                    chainName: NETWORK_CONFIG.chainName,
-                    nativeCurrency: NETWORK_CONFIG.nativeCurrency,
-                    rpcUrls: [NETWORK_CONFIG.publicRpcUrl],
-                    blockExplorerUrls: [NETWORK_CONFIG.blockExplorer],
-                  },
-                ],
-              });
-            } catch (addError) {
-              throw new Error('Failed to add network');
-            }
-          } else {
-            throw switchError;
+      // Check network and switch if needed
+      if (result.chainId !== NETWORK_CONFIG.chainId) {
+        const networkSwitched = await switchToNetwork(
+          NETWORK_CONFIG.chainId,
+          NETWORK_CONFIG.chainIdHex,
+          {
+            chainId: NETWORK_CONFIG.chainIdHex,
+            chainName: NETWORK_CONFIG.chainName,
+            nativeCurrency: NETWORK_CONFIG.nativeCurrency,
+            rpcUrls: [NETWORK_CONFIG.publicRpcUrl],
+            blockExplorerUrls: [NETWORK_CONFIG.blockExplorer],
           }
+        );
+
+        if (!networkSwitched) {
+          setTxStatus({
+            message: 'Please switch to OP Sepolia network manually',
+            type: 'error',
+          });
+          return;
         }
       }
 
       setWalletState({
         connected: true,
-        address: accounts[0],
+        address: result.address!,
         chainId: NETWORK_CONFIG.chainId,
       });
 
@@ -212,19 +191,10 @@ function App() {
       });
     } catch (error: any) {
       console.error('Wallet connection error:', error);
-
-      // Handle user rejection
-      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
-        setTxStatus({
-          message: 'Connection cancelled',
-          type: 'info',
-        });
-      } else {
-        setTxStatus({
-          message: error.message || 'Failed to connect wallet',
-          type: 'error',
-        });
-      }
+      setTxStatus({
+        message: error.message || 'Failed to connect wallet',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -292,6 +262,62 @@ function App() {
 
   return (
     <div className="app">
+      {/* Wallet Selector Modal */}
+      {showWalletModal && (
+        <div className="wallet-modal-overlay" onClick={() => setShowWalletModal(false)}>
+          <div className="wallet-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="wallet-modal-header">
+              <h2 className="wallet-modal-title">Connect Wallet</h2>
+              <button
+                className="wallet-modal-close"
+                onClick={() => setShowWalletModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="wallet-options">
+              {/* MetaMask Option */}
+              <div
+                className="wallet-option"
+                onClick={() => handleWalletSelect('metamask')}
+              >
+                <div className="wallet-option-icon">
+                  🦊
+                </div>
+                <div className="wallet-option-info">
+                  <h3 className="wallet-option-name">MetaMask</h3>
+                  <p className="wallet-option-description">
+                    {isMetaMaskInstalled()
+                      ? 'Connect with MetaMask extension'
+                      : 'MetaMask not installed'}
+                  </p>
+                </div>
+                <span className="wallet-option-arrow">→</span>
+              </div>
+
+              {/* WalletConnect Option */}
+              <div
+                className="wallet-option"
+                onClick={() => handleWalletSelect('walletconnect')}
+              >
+                <div className="wallet-option-icon">
+                  🔗
+                </div>
+                <div className="wallet-option-info">
+                  <h3 className="wallet-option-name">WalletConnect</h3>
+                  <p className="wallet-option-description">
+                    Scan with mobile wallet
+                  </p>
+                </div>
+                <span className="wallet-option-arrow">→</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="header">
         <h1>Explorer Protocol - Token Sale</h1>
         <p>OP Sepolia Testnet</p>

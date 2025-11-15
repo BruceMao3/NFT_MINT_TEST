@@ -2,25 +2,10 @@ import type { SdkResult, TxResult } from './types';
 import { ERROR_CODES, TxStatus } from './types';
 import { getWalletState } from './wallet';
 import { CONTRACT_ADDRESSES, TOKEN_IDS, calculateCost, parseContractError, NETWORK_CONFIG, type TokenId } from '../contracts/config';
+import { getCurrentProvider } from '../utils/walletConnection';
 import { encodeFunctionData, parseAbi } from 'viem';
 import MinterABI from '../contracts/Minter.abi.json';
 import ExplorerTokenABI from '../contracts/ExplorerToken.abi.json';
-
-// Helper function to get the preferred Ethereum provider
-function getEthereumProvider() {
-  if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
-    return null;
-  }
-
-  // If window.ethereum.providers exists, find MetaMask
-  if (window.ethereum.providers?.length) {
-    const metamask = window.ethereum.providers.find((p: any) => p.isMetaMask);
-    return metamask || window.ethereum.providers[0];
-  }
-
-  // Otherwise use window.ethereum directly
-  return window.ethereum;
-}
 
 // Buy tokens from the Minter contract
 export async function buyToken(
@@ -38,7 +23,7 @@ export async function buyToken(
   }
 
   try {
-    const provider = getEthereumProvider();
+    const provider = getCurrentProvider();
 
     if (!provider) {
       return {
@@ -138,7 +123,7 @@ export async function getTokenBalance(
   tokenId: TokenId
 ): Promise<SdkResult<number>> {
   try {
-    const provider = getEthereumProvider();
+    const provider = getCurrentProvider();
 
     if (!provider) {
       return {
@@ -182,7 +167,7 @@ export async function getTokenBalance(
 // Check if address is whitelisted
 export async function checkWhitelist(address: string): Promise<SdkResult<boolean>> {
   try {
-    const provider = getEthereumProvider();
+    const provider = getCurrentProvider();
 
     if (!provider) {
       return {
@@ -225,7 +210,7 @@ export async function checkWhitelist(address: string): Promise<SdkResult<boolean
 // Check if sale is active
 export async function checkSaleActive(): Promise<SdkResult<boolean>> {
   try {
-    const provider = getEthereumProvider();
+    const provider = getCurrentProvider();
 
     if (!provider) {
       return {
@@ -267,7 +252,7 @@ export async function checkSaleActive(): Promise<SdkResult<boolean>> {
 
 // Wait for transaction confirmation
 async function waitForTransaction(txHash: string): Promise<TxResult> {
-  const provider = getEthereumProvider();
+  const provider = getCurrentProvider();
 
   if (!provider) {
     return {
