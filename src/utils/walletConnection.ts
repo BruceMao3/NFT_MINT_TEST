@@ -38,19 +38,43 @@ export function isMetaMaskInstalled(): boolean {
  */
 export function getMetaMaskProvider() {
   if (typeof window === 'undefined' || !window.ethereum) {
+    console.error('❌ window.ethereum not found');
     return null;
   }
 
+  console.log('🔍 Checking for MetaMask...');
+  console.log('window.ethereum.isMetaMask:', window.ethereum.isMetaMask);
+  console.log('window.ethereum.isTrust:', (window.ethereum as any).isTrust);
+  console.log('window.ethereum.providers:', window.ethereum.providers);
+
   // If there are multiple providers, find MetaMask
   if (window.ethereum.providers?.length) {
-    return window.ethereum.providers.find((p: any) => p.isMetaMask) || null;
+    console.log('📦 Found multiple providers:', window.ethereum.providers.length);
+    window.ethereum.providers.forEach((p: any, i: number) => {
+      console.log(`  Provider ${i}:`, {
+        isMetaMask: p.isMetaMask,
+        isTrust: p.isTrust,
+        isPhantom: p.isPhantom,
+      });
+    });
+
+    const metamaskProvider = window.ethereum.providers.find((p: any) => p.isMetaMask);
+    if (metamaskProvider) {
+      console.log('✅ Found MetaMask in providers array');
+      return metamaskProvider;
+    } else {
+      console.warn('⚠️ MetaMask not found in providers array');
+      return null;
+    }
   }
 
   // If it's MetaMask, return it
   if (window.ethereum.isMetaMask) {
+    console.log('✅ window.ethereum is MetaMask');
     return window.ethereum;
   }
 
+  console.error('❌ MetaMask not found');
   return null;
 }
 
@@ -59,21 +83,33 @@ export function getMetaMaskProvider() {
  */
 export async function connectMetaMask(): Promise<WalletConnectionResult> {
   try {
+    console.log('🦊 [connectMetaMask] Starting MetaMask connection...');
+
     const provider = getMetaMaskProvider();
 
     if (!provider) {
+      console.error('❌ [connectMetaMask] MetaMask provider not found');
       return {
         success: false,
         error: 'MetaMask not installed. Please install MetaMask extension.',
       };
     }
 
-    console.log('Connecting to MetaMask...');
+    console.log('✅ [connectMetaMask] MetaMask provider found');
+    console.log('Provider details:', {
+      isMetaMask: provider.isMetaMask,
+      isTrust: (provider as any).isTrust,
+      isPhantom: (provider as any).isPhantom,
+    });
+
+    console.log('📞 [connectMetaMask] Requesting accounts...');
 
     // Request accounts
     const accounts = await provider.request({
       method: 'eth_requestAccounts',
     });
+
+    console.log('✅ [connectMetaMask] Accounts received:', accounts);
 
     if (!accounts || accounts.length === 0) {
       return {

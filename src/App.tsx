@@ -10,6 +10,7 @@ import {
   switchToNetwork,
   type WalletType
 } from './utils/walletConnection';
+import { diagnoseWalletEnvironment } from './utils/walletDiagnostics';
 import './App.css';
 
 declare global {
@@ -38,6 +39,10 @@ function App() {
 
   // Check wallet state
   useEffect(() => {
+    // Run diagnostics on first load
+    console.log('🚀 App loaded - Running wallet diagnostics...');
+    diagnoseWalletEnvironment();
+
     const checkWallet = async () => {
       const provider = getCurrentProvider();
       if (provider) {
@@ -133,6 +138,8 @@ function App() {
 
   // Connect with selected wallet type
   const handleWalletSelect = async (walletType: WalletType) => {
+    console.log('🎯 [handleWalletSelect] Selected wallet type:', walletType);
+
     setShowWalletModal(false);
     setLoading(true);
     setTxStatus({ message: '', type: 'info' });
@@ -141,20 +148,31 @@ function App() {
       let result;
 
       if (walletType === 'metamask') {
+        console.log('➡️ Connecting to MetaMask...');
         result = await connectMetaMask();
       } else if (walletType === 'walletconnect') {
-        result = await connectWalletConnect();
+        console.log('➡️ WalletConnect selected');
+        setTxStatus({
+          message: 'WalletConnect support coming soon! Please use MetaMask for now.',
+          type: 'info',
+        });
+        setLoading(false);
+        return;
       } else {
         throw new Error('Unknown wallet type');
       }
 
       if (!result.success) {
+        console.error('❌ Connection failed:', result.error);
         setTxStatus({
           message: result.error || 'Failed to connect wallet',
           type: 'error',
         });
+        setLoading(false);
         return;
       }
+
+      console.log('✅ Connection successful:', result);
 
       // Check network and switch if needed
       if (result.chainId !== NETWORK_CONFIG.chainId) {
