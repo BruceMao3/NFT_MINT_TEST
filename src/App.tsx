@@ -27,6 +27,7 @@ function App() {
   const [saleActive, setSaleActive] = useState(false);
   const [isWhitelisted, setIsWhitelisted] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [wasDisconnected, setWasDisconnected] = useState(false);
   const [balances, setBalances] = useState<Record<TokenId, number>>({
     [TOKEN_IDS.POWER]: 0,
     [TOKEN_IDS.OIL]: 0,
@@ -156,7 +157,12 @@ function App() {
 
       if (walletType === 'metamask') {
         console.log('➡️ Connecting to MetaMask...');
-        result = await connectMetaMask();
+        // If user just disconnected, force MetaMask to show account selection
+        result = await connectMetaMask(wasDisconnected);
+        // Reset the flag after connection attempt
+        if (wasDisconnected) {
+          setWasDisconnected(false);
+        }
       } else if (walletType === 'walletconnect') {
         console.log('➡️ WalletConnect selected');
         setTxStatus({
@@ -236,6 +242,8 @@ function App() {
     setWalletState(disconnectedState);
     // Sync with SDK state
     updateWalletState(disconnectedState);
+    // Set flag to force account selection on next connect
+    setWasDisconnected(true);
     setTxStatus({ message: '', type: 'info' });
   };
 

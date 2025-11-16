@@ -165,8 +165,9 @@ export function getMetaMaskProvider() {
 
 /**
  * Connect to MetaMask
+ * @param forceReconnect - If true, forces MetaMask to show account selection dialog
  */
-export async function connectMetaMask(): Promise<WalletConnectionResult> {
+export async function connectMetaMask(forceReconnect: boolean = false): Promise<WalletConnectionResult> {
   try {
     console.log('🦊 [connectMetaMask] Starting MetaMask connection...');
 
@@ -189,8 +190,29 @@ export async function connectMetaMask(): Promise<WalletConnectionResult> {
 
     console.log('📞 [connectMetaMask] Requesting accounts...');
 
+    let accounts;
+
+    // If forceReconnect is true, request new permissions to force account selection
+    if (forceReconnect) {
+      console.log('🔄 [connectMetaMask] Force reconnect - requesting new permissions...');
+      try {
+        // Request new permissions - this will show the account selection dialog
+        await provider.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      } catch (permError: any) {
+        // If user cancels, throw to handle below
+        if (permError.code === 4001) {
+          throw permError;
+        }
+        // If wallet_requestPermissions is not supported or fails, continue with eth_requestAccounts
+        console.warn('⚠️ wallet_requestPermissions failed, falling back to eth_requestAccounts');
+      }
+    }
+
     // Request accounts
-    const accounts = await provider.request({
+    accounts = await provider.request({
       method: 'eth_requestAccounts',
     });
 
