@@ -354,7 +354,7 @@ function App() {
 
       <header className="header">
         <h1>Explorer Protocol - Token Sale</h1>
-        <p>OP Sepolia Testnet</p>
+        <p>ETH Sepolia Testnet</p>
       </header>
 
       <main className="main">
@@ -477,7 +477,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Explorer Protocol - Powered by OP Sepolia</p>
+        <p>Explorer Protocol</p>
       </footer>
     </div>
   );
