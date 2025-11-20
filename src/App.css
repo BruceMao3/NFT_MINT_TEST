@@ -590,15 +590,44 @@ body {
   text-align: center;
 }
 
-.dashboard-loading,
-.dashboard-error {
+.dashboard-loading {
   text-align: center;
-  padding: 2rem;
+  padding: 3rem 2rem;
   color: #666;
+  font-size: 1rem;
 }
 
-.dashboard-error {
-  color: #ef4444;
+.dashboard-error-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.dashboard-error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-error-title {
+  color: #991b1b;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-error-message {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  font-family: 'Courier New', monospace;
+}
+
+.dashboard-error-hint {
+  color: #666;
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
 
 .dashboard-overall {

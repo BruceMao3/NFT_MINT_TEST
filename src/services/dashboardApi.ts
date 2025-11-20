@@ -83,21 +83,38 @@ export async function getDashboardOverview(
   chainId: number
 ): Promise<{ ok: boolean; data?: DashboardOverview; error?: string }> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     const response = await fetch(`${API_BASE_URL}/dashboard/overview?chainId=${chainId}`, {
       headers: {
         'X-API-Key': API_KEY,
+        'Content-Type': 'application/json',
       },
+      signal: controller.signal,
+      mode: 'cors',
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      return { ok: false, error: `API Error: ${response.status} - ${errorText}` };
+      let errorText = `HTTP ${response.status}`;
+      try {
+        const errorData = await response.text();
+        if (errorData) errorText += `: ${errorData}`;
+      } catch (e) {
+        // Ignore parse error
+      }
+      return { ok: false, error: errorText };
     }
 
     const data = await response.json();
     return { ok: true, data };
   } catch (error: any) {
-    return { ok: false, error: error.message };
+    if (error.name === 'AbortError') {
+      return { ok: false, error: 'Request timeout - API is taking too long to respond' };
+    }
+    return { ok: false, error: error.message || 'Network error' };
   }
 }
 

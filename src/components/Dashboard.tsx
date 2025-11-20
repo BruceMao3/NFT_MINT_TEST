@@ -16,16 +16,32 @@ export function Dashboard({ chainId, userAddress, userBalances }: DashboardProps
   // Load dashboard data
   useEffect(() => {
     const loadDashboard = async () => {
-      setLoading(true);
+      // Don't show loading if we already have stats (for refresh)
+      if (!stats) {
+        setLoading(true);
+      }
       setError(null);
 
-      const result = await getDashboardOverview(chainId);
+      try {
+        const result = await getDashboardOverview(chainId);
 
-      if (result.ok && result.data) {
-        const parsedStats = parseOverviewStats(result.data);
-        setStats(parsedStats);
-      } else {
-        setError(result.error || 'Failed to load dashboard data');
+        if (result.ok && result.data) {
+          const parsedStats = parseOverviewStats(result.data);
+          setStats(parsedStats);
+          setError(null);
+        } else {
+          // Only show error if we don't have cached stats
+          if (!stats) {
+            setError(result.error || 'Failed to load dashboard data');
+          }
+          console.warn('Dashboard update failed:', result.error);
+        }
+      } catch (err: any) {
+        // Only show error if we don't have cached stats
+        if (!stats) {
+          setError(err.message || 'Network error');
+        }
+        console.error('Dashboard error:', err);
       }
 
       setLoading(false);
@@ -67,8 +83,16 @@ export function Dashboard({ chainId, userAddress, userBalances }: DashboardProps
   if (error && !stats) {
     return (
       <div className="dashboard">
-        <div className="dashboard-error">
-          Failed to load dashboard: {error}
+        <h2 className="dashboard-title">Dashboard</h2>
+        <div className="dashboard-error-card">
+          <div className="dashboard-error-icon">⚠️</div>
+          <div className="dashboard-error-title">Unable to load dashboard</div>
+          <div className="dashboard-error-message">{error}</div>
+          <div className="dashboard-error-hint">
+            The dashboard will show data once the API is available.
+            <br />
+            You can still connect your wallet and purchase tokens below.
+          </div>
         </div>
       </div>
     );
