@@ -36,10 +36,20 @@ body {
 
 .main {
   flex: 1;
-  max-width: 800px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
   padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Wallet Section */
@@ -564,6 +574,213 @@ body {
   font-size: 1.25rem;
 }
 
+/* Dashboard Styles */
+.dashboard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-title {
+  color: #333;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.dashboard-loading,
+.dashboard-error {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.dashboard-error {
+  color: #ef4444;
+}
+
+.dashboard-overall {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+}
+
+.dashboard-stat-label {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.dashboard-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.dashboard-nfts {
+  margin-top: 1.5rem;
+}
+
+.dashboard-section-title {
+  color: #333;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.nft-progress-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.nft-progress-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.nft-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.nft-progress-name {
+  color: #333;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.nft-progress-stats {
+  color: #666;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  background: #e5e7eb;
+  border-radius: 8px;
+  height: 28px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  position: relative;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  height: 100%;
+  transition: width 0.5s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+}
+
+.progress-bar-text {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.nft-progress-details {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.nft-progress-remaining {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.nft-user-info {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.nft-user-balance {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.nft-vesting {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.nft-vesting-label {
+  color: #666;
+}
+
+.nft-vesting-time {
+  color: #ef4444;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.nft-vesting-time.vested {
+  color: #10b981;
+}
+
+/* Sale Container */
+.sale-container {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Token Card Disabled State */
+.token-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-card.disabled:hover {
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+.token-requirement {
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-weight: 500;
+}
+
+.token-requirement.met {
+  color: #10b981;
+}
+
+.token-requirement.unmet {
+  color: #ef4444;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .header h1 {
@@ -588,6 +805,19 @@ body {
     padding: 1rem;
   }
 
+  .dashboard,
+  .sale-container {
+    padding: 1.5rem;
+  }
+
+  .dashboard-title {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-stat-value {
+    font-size: 1.5rem;
+  }
+
   .stats-section {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -608,5 +838,10 @@ body {
 
   .section-title {
     font-size: 1.25rem;
+  }
+
+  .nft-user-info {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

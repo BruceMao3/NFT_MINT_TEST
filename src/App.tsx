@@ -11,6 +11,7 @@ import {
   type WalletType
 } from './utils/walletConnection';
 import { diagnoseWalletEnvironment } from './utils/walletDiagnostics';
+import { Dashboard } from './components/Dashboard';
 import './App.css';
 
 declare global {
@@ -264,6 +265,18 @@ function App() {
       return;
     }
 
+    // Check POWER balance requirement for OIL token
+    if (selectedToken === TOKEN_IDS.OIL) {
+      const powerBalance = balances[TOKEN_IDS.POWER] || 0;
+      if (powerBalance < 20) {
+        setTxStatus({
+          message: `You need at least 20 POWER tokens to mint OIL. Current balance: ${powerBalance}`,
+          type: 'error',
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     setTxStatus({
       message: 'Preparing transaction...',
@@ -366,122 +379,143 @@ function App() {
       </header>
 
       <main className="main">
-        {/* Wallet Connection */}
-        <div className="wallet-section" data-testid="wallet-section">
-          {walletState.connected ? (
-            <div className="wallet-connected">
-              <span data-testid="wallet-address">
-                Connected: {formatAddress(walletState.address!)}
-                {isWhitelisted && <span className="whitelist-badge">Whitelisted</span>}
-              </span>
-              <button onClick={handleDisconnectWallet} className="btn btn-secondary">
-                Disconnect
+        {/* Dashboard Section */}
+        <Dashboard
+          chainId={NETWORK_CONFIG.chainId}
+          userAddress={walletState.connected ? walletState.address : undefined}
+          userBalances={{
+            '1': balances[TOKEN_IDS.POWER],
+            '2': balances[TOKEN_IDS.OIL],
+            '3': balances[TOKEN_IDS.EXPLORER],
+          }}
+        />
+
+        {/* Wallet Connection & Token Sale Section */}
+        <div className="sale-container">
+          <div className="wallet-section" data-testid="wallet-section">
+            {walletState.connected ? (
+              <div className="wallet-connected">
+                <span data-testid="wallet-address">
+                  Connected: {formatAddress(walletState.address!)}
+                  {isWhitelisted && <span className="whitelist-badge">Whitelisted</span>}
+                </span>
+                <button onClick={handleDisconnectWallet} className="btn btn-secondary">
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectWallet}
+                className="btn btn-primary"
+                disabled={loading}
+                data-testid="connect-wallet-btn"
+              >
+                {loading ? 'Connecting...' : 'Connect Wallet'}
               </button>
+            )}
+          </div>
+
+          {/* Sale Status */}
+          <div className="sale-status">
+            <span className={saleActive ? 'status-active' : 'status-inactive'}>
+              Sale Status: {saleActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+
+          {/* Token Selection */}
+          <div className="token-selection">
+            <h2>Select Token</h2>
+            <div className="token-grid">
+              {([TOKEN_IDS.POWER, TOKEN_IDS.OIL, TOKEN_IDS.EXPLORER] as TokenId[]).map((tokenId) => {
+                const tokenInfo = TOKEN_CONFIG[tokenId];
+                const powerBalance = balances[TOKEN_IDS.POWER] || 0;
+                const canMintOil = tokenId !== TOKEN_IDS.OIL || powerBalance >= 20;
+                
+                return (
+                  <div
+                    key={tokenId}
+                    className={`token-card ${selectedToken === tokenId ? 'selected' : ''} ${!canMintOil ? 'disabled' : ''}`}
+                    onClick={() => canMintOil && setSelectedToken(tokenId)}
+                  >
+                    <h3>{tokenInfo.name}</h3>
+                    <p className="token-price">{tokenInfo.priceETH} ETH</p>
+                    <p className="token-description">{tokenInfo.description}</p>
+                    {tokenInfo.whitelistRequired && (
+                      <p className="whitelist-required">Whitelist Required</p>
+                    )}
+                    {tokenId === TOKEN_IDS.OIL && walletState.connected && (
+                      <p className={`token-requirement ${canMintOil ? 'met' : 'unmet'}`}>
+                        Requires: 20 POWER (You have: {powerBalance})
+                      </p>
+                    )}
+                    {walletState.connected && (
+                      <p className="token-balance">Balance: {balances[tokenId]}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ) : (
+          </div>
+
+          {/* Amount Selection */}
+          <div className="amount-section">
+            <h2>Amount</h2>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={amount}
+              onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 1))}
+              className="amount-input"
+            />
+            <p className="total-cost">Total Cost: {totalCost.toFixed(7)} ETH</p>
+          </div>
+
+          {/* Buy Button */}
+          <div className="mint-section">
             <button
-              onClick={handleConnectWallet}
-              className="btn btn-primary"
-              disabled={loading}
-              data-testid="connect-wallet-btn"
+              onClick={handleBuy}
+              className="btn btn-mint"
+              disabled={loading || !saleActive}
+              data-testid="buy-btn"
             >
-              {loading ? 'Connecting...' : 'Connect Wallet'}
+              {loading
+                ? 'Processing...'
+                : !saleActive
+                ? 'Sale Inactive'
+                : walletState.connected
+                ? `Buy ${amount} ${selectedTokenInfo.name}`
+                : 'Connect Wallet to Buy'}
             </button>
+          </div>
+
+          {/* Transaction Status */}
+          {txStatus.message && (
+            <div className={`tx-status tx-status-${txStatus.type}`} data-testid="tx-status">
+              {txStatus.message}
+            </div>
+          )}
+
+          {/* View on Block Explorer */}
+          {walletState.connected && (
+            <div className="explorer-links">
+              <a
+                href={getExplorerUrls(CONTRACT_ADDRESSES.Minter, 'address')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Minter Contract
+              </a>
+              <a
+                href={getExplorerUrls(CONTRACT_ADDRESSES.ExplorerToken, 'address')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Token Contract
+              </a>
+            </div>
           )}
         </div>
-
-        {/* Sale Status */}
-        <div className="sale-status">
-          <span className={saleActive ? 'status-active' : 'status-inactive'}>
-            Sale Status: {saleActive ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-
-        {/* Token Selection */}
-        <div className="token-selection">
-          <h2>Select Token</h2>
-          <div className="token-grid">
-            {([TOKEN_IDS.POWER, TOKEN_IDS.OIL, TOKEN_IDS.EXPLORER] as TokenId[]).map((tokenId) => {
-              const tokenInfo = TOKEN_CONFIG[tokenId];
-              return (
-                <div
-                  key={tokenId}
-                  className={`token-card ${selectedToken === tokenId ? 'selected' : ''}`}
-                  onClick={() => setSelectedToken(tokenId)}
-                >
-                  <h3>{tokenInfo.name}</h3>
-                  <p className="token-price">{tokenInfo.priceETH} ETH</p>
-                  <p className="token-description">{tokenInfo.description}</p>
-                  {tokenInfo.whitelistRequired && (
-                    <p className="whitelist-required">Whitelist Required</p>
-                  )}
-                  {walletState.connected && (
-                    <p className="token-balance">Balance: {balances[tokenId]}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Amount Selection */}
-        <div className="amount-section">
-          <h2>Amount</h2>
-          <input
-            type="number"
-            min="1"
-            max="100"
-            value={amount}
-            onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 1))}
-            className="amount-input"
-          />
-          <p className="total-cost">Total Cost: {totalCost.toFixed(7)} ETH</p>
-        </div>
-
-        {/* Buy Button */}
-        <div className="mint-section">
-          <button
-            onClick={handleBuy}
-            className="btn btn-mint"
-            disabled={loading || !saleActive}
-            data-testid="buy-btn"
-          >
-            {loading
-              ? 'Processing...'
-              : !saleActive
-              ? 'Sale Inactive'
-              : walletState.connected
-              ? `Buy ${amount} ${selectedTokenInfo.name}`
-              : 'Connect Wallet to Buy'}
-          </button>
-        </div>
-
-        {/* Transaction Status */}
-        {txStatus.message && (
-          <div className={`tx-status tx-status-${txStatus.type}`} data-testid="tx-status">
-            {txStatus.message}
-          </div>
-        )}
-
-        {/* View on Block Explorer */}
-        {walletState.connected && (
-          <div className="explorer-links">
-            <a
-              href={getExplorerUrls(CONTRACT_ADDRESSES.Minter, 'address')}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View Minter Contract
-            </a>
-            <a
-              href={getExplorerUrls(CONTRACT_ADDRESSES.ExplorerToken, 'address')}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View Token Contract
-            </a>
-          </div>
-        )}
       </main>
 
       <footer className="footer">
