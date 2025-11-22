@@ -102,26 +102,50 @@ export function Dashboard({ chainId, userAddress, userBalances }: DashboardProps
     return null;
   }
 
+  // Format number for display
+  const formatNumber = (num: number, decimals: number = 4): string => {
+    if (num === 0) return '0';
+    if (num < 0.0001) return num.toExponential(2);
+    return num.toFixed(decimals);
+  };
+
+  // Check if there's any USD raised (USDT + USDC)
+  const totalUSD = stats.totalRaisedUSDT + stats.totalRaisedUSDC;
+  const hasETH = stats.totalRaisedETH > 0;
+  const hasUSD = totalUSD > 0;
+
   return (
     <div className="dashboard">
       <h2 className="dashboard-title">Dashboard</h2>
 
       {/* Overall Stats */}
       <div className="dashboard-overall">
+        {/* Total Gathered Tokens */}
         <div className="dashboard-stat-card">
-          <div className="dashboard-stat-label">Total Raised</div>
-          <div className="dashboard-stat-value">{stats.totalRaisedETH.toFixed(4)} ETH</div>
+          <div className="dashboard-stat-label">Total Gathered</div>
+          <div className="dashboard-stat-value">
+            {hasETH && <div>{formatNumber(stats.totalRaisedETH)} ETH</div>}
+            {hasUSD && <div>{formatNumber(totalUSD, 2)} USD</div>}
+            {!hasETH && !hasUSD && <div>0</div>}
+          </div>
+          {(stats.totalRaisedUSDT > 0 || stats.totalRaisedUSDC > 0) && (
+            <div className="dashboard-stat-detail">
+              {stats.totalRaisedUSDT > 0 && <span>{formatNumber(stats.totalRaisedUSDT, 2)} USDT</span>}
+              {stats.totalRaisedUSDT > 0 && stats.totalRaisedUSDC > 0 && <span> + </span>}
+              {stats.totalRaisedUSDC > 0 && <span>{formatNumber(stats.totalRaisedUSDC, 2)} USDC</span>}
+            </div>
+          )}
         </div>
 
-        {stats.uniqueAddresses > 0 && (
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-label">Unique Addresses</div>
-            <div className="dashboard-stat-value">{stats.uniqueAddresses}</div>
-          </div>
-        )}
+        {/* Unique Buyer Count */}
+        <div className="dashboard-stat-card">
+          <div className="dashboard-stat-label">Participants</div>
+          <div className="dashboard-stat-value">{stats.uniqueBuyerCount}</div>
+          <div className="dashboard-stat-detail">Paid addresses only</div>
+        </div>
       </div>
 
-      {/* NFT Progress */}
+      {/* NFT Mint Progress */}
       <div className="dashboard-nfts">
         <h3 className="dashboard-section-title">NFT Mint Progress</h3>
         {stats.nftStats.map((nft: NFTStats) => (
@@ -137,32 +161,29 @@ export function Dashboard({ chainId, userAddress, userBalances }: DashboardProps
             <div className="progress-bar-container">
               <div
                 className="progress-bar-fill"
-                style={{ width: `${nft.progress}%` }}
+                style={{ width: `${Math.min(nft.progress, 100)}%` }}
               >
-                <span className="progress-bar-text">{nft.progress.toFixed(1)}%</span>
+                {nft.progress >= 5 && (
+                  <span className="progress-bar-text">{nft.progress.toFixed(1)}%</span>
+                )}
               </div>
-            </div>
-
-            <div className="nft-progress-details">
-              <span className="nft-progress-remaining">
-                Remaining: {nft.remaining}
-              </span>
+              {nft.progress < 5 && (
+                <span className="progress-bar-text-outside">{nft.progress.toFixed(1)}%</span>
+              )}
             </div>
 
             {/* User Balance and Vesting */}
-            {userAddress && (
+            {userAddress && userBalances[nft.tokenId] > 0 && (
               <div className="nft-user-info">
                 <div className="nft-user-balance">
-                  Your Balance: {userBalances[nft.tokenId] || 0}
+                  Your Balance: {userBalances[nft.tokenId]}
                 </div>
-                {userBalances[nft.tokenId] > 0 && (
-                  <div className="nft-vesting">
-                    <span className="nft-vesting-label">Vesting: </span>
-                    <span className={`nft-vesting-time ${nft.isVested ? 'vested' : ''}`}>
-                      {vestingCountdowns[nft.tokenId] || 'Loading...'}
-                    </span>
-                  </div>
-                )}
+                <div className="nft-vesting">
+                  <span className="nft-vesting-label">Vesting: </span>
+                  <span className={`nft-vesting-time ${nft.isVested ? 'vested' : ''}`}>
+                    {vestingCountdowns[nft.tokenId] || 'Loading...'}
+                  </span>
+                </div>
               </div>
             )}
           </div>

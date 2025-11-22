@@ -31,13 +31,21 @@ export interface DashboardOverview {
     saleActive: boolean;
     tokenAddress: string;
     treasuryAddress: string;
+    usdt: string;
+    usdc: string;
+    profitSharingContract: string;
+    uniqueBuyerCount: string;
     prices: any[];
     dependencies: any[];
   };
   treasury: {
     address: string;
     paused: boolean;
-    balanceWei: string;
+    balanceETH: string;
+    balanceUSDT: string;
+    balanceUSDC: string;
+    usdt: string;
+    usdc: string;
   };
   connections: {
     minterHasRole: boolean;
@@ -58,9 +66,10 @@ export interface NFTStats {
 }
 
 export interface OverallStats {
-  totalRaised: string;
   totalRaisedETH: number;
-  uniqueAddresses: number;
+  totalRaisedUSDT: number;
+  totalRaisedUSDC: number;
+  uniqueBuyerCount: number;
   nftStats: NFTStats[];
 }
 
@@ -126,38 +135,43 @@ export function parseOverviewStats(overview: DashboardOverview): OverallStats {
     '3': 'EXPLORER',
   };
 
-  // Calculate NFT stats
-  const nftStats: NFTStats[] = overview.token.supply.map((supply) => {
-    const minted = parseInt(supply.totalSupply);
-    const maxSupply = parseInt(supply.maxSupply);
-    const remaining = maxSupply - minted;
-    const progress = maxSupply > 0 ? (minted / maxSupply) * 100 : 0;
-    const vestingTime = parseInt(supply.vestingTime);
+  // Calculate NFT stats - filter out tokens with maxSupply = 0
+  const nftStats: NFTStats[] = overview.token.supply
+    .filter((supply) => parseInt(supply.maxSupply) > 0)
+    .map((supply) => {
+      const minted = parseInt(supply.totalSupply);
+      const maxSupply = parseInt(supply.maxSupply);
+      const remaining = maxSupply - minted;
+      const progress = maxSupply > 0 ? (minted / maxSupply) * 100 : 0;
+      const vestingTime = parseInt(supply.vestingTime);
 
-    return {
-      tokenId: supply.id,
-      name: TOKEN_NAMES[supply.id] || `Token #${supply.id}`,
-      minted,
-      remaining,
-      maxSupply,
-      progress,
-      vestingTime,
-      isVested: supply.isVested,
-    };
-  });
+      return {
+        tokenId: supply.id,
+        name: TOKEN_NAMES[supply.id] || `Token #${supply.id}`,
+        minted,
+        remaining,
+        maxSupply,
+        progress,
+        vestingTime,
+        isVested: supply.isVested,
+      };
+    });
 
-  // Convert treasury balance from Wei to ETH
-  const totalRaisedWei = BigInt(overview.treasury.balanceWei);
-  const totalRaisedETH = Number(totalRaisedWei) / 1e18;
+  // Convert treasury balances
+  // ETH: from Wei (10^18) to ETH
+  const totalRaisedETH = Number(BigInt(overview.treasury.balanceETH || '0')) / 1e18;
+  // USDT/USDC: from smallest unit (10^6) to human readable
+  const totalRaisedUSDT = Number(BigInt(overview.treasury.balanceUSDT || '0')) / 1e6;
+  const totalRaisedUSDC = Number(BigInt(overview.treasury.balanceUSDC || '0')) / 1e6;
 
-  // Note: unique addresses calculation would need to be done on backend
-  // For now we can estimate or leave as placeholder
-  const uniqueAddresses = 0; // Placeholder - needs backend support
+  // Get unique buyer count from minter (excluding airdrops, only paid participants)
+  const uniqueBuyerCount = parseInt(overview.minter.uniqueBuyerCount || '0');
 
   return {
-    totalRaised: overview.treasury.balanceWei,
     totalRaisedETH,
-    uniqueAddresses,
+    totalRaisedUSDT,
+    totalRaisedUSDC,
+    uniqueBuyerCount,
     nftStats,
   };
 }

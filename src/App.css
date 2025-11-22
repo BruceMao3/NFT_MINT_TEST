@@ -657,6 +657,12 @@ body {
   font-weight: 700;
 }
 
+.dashboard-stat-detail {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-top: 0.25rem;
+}
+
 .dashboard-nfts {
   margin-top: 1.5rem;
 }
@@ -723,6 +729,16 @@ body {
 
 .progress-bar-text {
   color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.progress-bar-text-outside {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #666;
   font-size: 0.75rem;
   font-weight: 600;
 }
